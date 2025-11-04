@@ -1,0 +1,140 @@
+-- Create database
+CREATE DATABASE IF NOT EXISTS carwash_system;
+USE carwash_system;
+
+-- Users table (for staff and admins)
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('main_admin', 'admin', 'staff') NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Vehicle types table
+CREATE TABLE IF NOT EXISTS vehicle_types (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Service types table
+CREATE TABLE IF NOT EXISTS service_types (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    duration_minutes INT NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Customers table
+CREATE TABLE IF NOT EXISTS customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    email VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Vehicles table
+CREATE TABLE IF NOT EXISTS vehicles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    plate_number VARCHAR(20) NOT NULL,
+    vehicle_type_id INT NOT NULL,
+    brand VARCHAR(50),
+    model VARCHAR(50),
+    color VARCHAR(30),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+    FOREIGN KEY (vehicle_type_id) REFERENCES vehicle_types(id)
+);
+
+-- Queue table
+CREATE TABLE IF NOT EXISTS queue (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    vehicle_id INT NOT NULL,
+    service_type_id INT NOT NULL,
+    status ENUM('waiting', 'in_progress', 'completed', 'cancelled') DEFAULT 'waiting',
+    position INT,
+    estimated_wait_time INT, -- in minutes
+    started_at TIMESTAMP NULL,
+    completed_at TIMESTAMP NULL,
+    payment_status ENUM('pending', 'paid') DEFAULT 'pending',
+    staff_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE,
+    FOREIGN KEY (service_type_id) REFERENCES service_types(id),
+    FOREIGN KEY (staff_id) REFERENCES users(id)
+);
+
+-- Service history table
+CREATE TABLE IF NOT EXISTS service_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    queue_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    vehicle_id INT NOT NULL,
+    service_type_id INT NOT NULL,
+    staff_id INT NOT NULL,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (queue_id) REFERENCES queue(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
+    FOREIGN KEY (service_type_id) REFERENCES service_types(id),
+    FOREIGN KEY (staff_id) REFERENCES users(id)
+);
+
+-- Settings table for system configuration
+CREATE TABLE IF NOT EXISTS settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(100) UNIQUE NOT NULL,
+    setting_value TEXT,
+    description TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_queue_status ON queue(status);
+CREATE INDEX IF NOT EXISTS idx_queue_position ON queue(position);
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_vehicles_plate ON vehicles(plate_number);
+
+-- Sample data for testing (only insert if not exists)
+INSERT IGNORE INTO users (username, password, role, first_name, last_name, email, phone) VALUES
+('mainadmin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'main_admin', 'Main', 'Admin', 'main@carwash.com', '1234567890'),
+('admin1', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'John', 'Admin', 'admin@carwash.com', '1234567891'),
+('staff1', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff', 'Jane', 'Staff', 'staff@carwash.com', '1234567892');
+
+INSERT IGNORE INTO vehicle_types (name, description) VALUES
+('Sedan', 'Standard passenger car'),
+('SUV', 'Sport Utility Vehicle'),
+('Truck', 'Pickup truck'),
+('Van', 'Minivan or cargo van'),
+('Motorcycle', 'Two-wheeled vehicle');
+
+INSERT IGNORE INTO service_types (name, description, duration_minutes, price) VALUES
+('Basic Wash', 'Exterior wash and dry', 30, 15.00),
+('Full Service Wash', 'Interior and exterior cleaning', 60, 35.00),
+('Deluxe Detail', 'Complete detailing service', 120, 75.00),
+('Quick Wash', 'Fast exterior wash', 15, 10.00);
+
+INSERT IGNORE INTO settings (setting_key, setting_value, description) VALUES
+('public_display_title', 'Car Wash Pro Queue', 'Title displayed on public queue view'),
+('auto_refresh_interval', '30', 'Auto-refresh interval in seconds for queue display'),
+('business_hours_start', '08:00', 'Business opening time'),
+('business_hours_end', '18:00', 'Business closing time');
